@@ -3951,31 +3951,35 @@ function UI.new(options)
 	-- Errors here are caught by the pcall in runKeyCheck ("Something went wrong").
 	local function validateKey(key)
 		local reason
+		local isPremium = false
 
 		-- Key = { "a", "b" } | "a" | function(key) | Jnkie:Validator()
 		if KEY_LIST ~= nil then
 			if isCallable(KEY_LIST) then
 				local valid, why = KEY_LIST(key)
 				if valid then
-					return true
+					return true, nil, false
 				end
 				reason = why
 			elseif type(KEY_LIST) == "table" then
 				for _, k in ipairs(KEY_LIST) do
 					if tostring(k) == key then
-						return true
+						return true, nil, false
 					end
 				end
 			elseif tostring(KEY_LIST) == key then
-				return true
+				return true, nil, false
 			end
 		end
 
 		-- KeySystem.API (Platoboost / Panda / Jnkie / custom)
 		for _, service in ipairs(API_SERVICES) do
+			-- Clear any previous result so a later validation can't inherit premium status.
+			service.isPremium = false
 			local ok, valid, why = pcall(service.CheckKey, service, key)
 			if ok and valid then
-				return true
+				isPremium = service.isPremium == true
+				return true, nil, isPremium
 			end
 			reason = (ok and why) or (not ok and tostring(valid)) or reason
 		end
@@ -5702,8 +5706,8 @@ function UI.new(options)
 				result = { ok = true, valid = true }
 				return
 			end
-			local ok, valid, reason = pcall(validateKey, key)
-			result = { ok = ok, valid = valid, reason = reason }
+			local ok, valid, reason, isPremium = pcall(validateKey, key)
+			result = { ok = ok, valid = valid, reason = reason, isPremium = isPremium == true }
 		end)
 
 		fadeContent(0, 0.25)
@@ -5858,14 +5862,10 @@ function UI.new(options)
 				callback = fn
 			end
 			if type(callback) == "function" then
-				local authContext = { IsPremium = false, Premium = false }
-				for _, service in ipairs(API_SERVICES) do
-					if service.isPremium == true then
-						authContext.IsPremium = true
-						authContext.Premium = true
-						break
-					end
-				end
+				local authContext = {
+					IsPremium = result and result.isPremium == true or false,
+					Premium = result and result.isPremium == true or false,
+				}
 				local ok, err = pcall(callback, key, authContext)
 				if not ok then
 					runError = err
