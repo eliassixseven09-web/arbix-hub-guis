@@ -137,7 +137,7 @@ __modules["variables"] = function()
 		Title = "Ophyn",
 		Description = "Key System",
 		Logo = "rbxassetid://111673746737789", -- rbxassetid
-		Theme = "Plant-Dark",
+		Theme = "Dark",
 		Folder = "Ophyn-KSY",
 
 		-- Buttons Config
