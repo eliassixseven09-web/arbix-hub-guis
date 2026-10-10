@@ -5095,8 +5095,8 @@ function UI.new(options)
 						notify("Couldn't get a key", tostring((not ok) and link or err or "Try again."), "warn", "link", 5)
 					end
 				end)
+				return
 			end
-			return
 		end
 
 		if LINKS.getKey ~= "" then
