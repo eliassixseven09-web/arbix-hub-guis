@@ -5858,7 +5858,15 @@ function UI.new(options)
 				callback = fn
 			end
 			if type(callback) == "function" then
-				local ok, err = pcall(callback, key)
+				local authContext = { IsPremium = false, Premium = false }
+				for _, service in ipairs(API_SERVICES) do
+					if service.isPremium == true then
+						authContext.IsPremium = true
+						authContext.Premium = true
+						break
+					end
+				end
+				local ok, err = pcall(callback, key, authContext)
 				if not ok then
 					runError = err
 				end
