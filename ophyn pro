@@ -10,6 +10,16 @@
 	  * get-key dropdown closes on outside click
 	  * theme/font/gradient bindings are released when the window is destroyed
 	  * removed dead modules (window/dialog, nothing.com/yeahnothing), renamed AirflowBlur
+
+	CUSTOMIZING THE UI
+	  * The default values are grouped in the `variables` module below. Change those
+	    defaults if every window should use the same look and behavior.
+	  * For one window only, pass overrides to KeySystem.new({...}); values in that
+	    options table take priority over defaults.
+	  * The UI image IDs are grouped in `images/images`. `Logo` and the keyless popup
+	    icon can also be set separately in the window options.
+	  * The public Set* helpers near the bottom let a setup script adjust fonts,
+	    tabs, notifications, and the Get Key button without editing this file.
 ]]
 
 local __modules = {}
@@ -112,7 +122,11 @@ __modules["utilities/http"] = function()
 end
 
 __modules["images/images"] = function()
-	-- All Roblox asset IDs (images, icons, and font) used by the UI.
+	-- Default Roblox asset IDs used by the UI. Use `rbxassetid://<number>` format.
+	-- LOGO is the default main logo; KEYLESS is the default keyless-popup icon.
+	-- Change the matching ID here to replace a built-in image globally. Window
+	-- options can override the main logo with Logo and popup image with
+	-- KeylessPopup.IconAssetId.
 	local Images = {
 		FONT = "rbxassetid://12187365364",
 		KEY = "rbxassetid://96510194465420",
@@ -133,32 +147,34 @@ end
 
 __modules["variables"] = function()
 	return {
-		-- Window Config
+		-- DEFAULT CUSTOMIZATION: These are fallback values for every window.
+		-- You can override them per window with KeySystem.new({ ... }).
+		-- Window identity and appearance
 		Title = "Ophyn",
 		Description = "Key System",
-		Logo = "rbxassetid://111673746737789", -- rbxassetid
-		Theme = "Dark",
-		Folder = "Ophyn-KSY",
+		Logo = "rbxassetid://111673746737789", -- Main GUI logo image asset ID.
+		Theme = "Dark", -- Starting theme; e.g. "Dark", "Amethyst", or another THEMES entry.
+		Folder = "Ophyn-KSY", -- Storage name used when SaveKey is enabled.
 
-		-- Buttons Config
+		-- Show the built-in Get Key control. Add destinations with KeySystem:GetMethod(...).
 		getkey = true,
 
-		-- Intro Config
-		Intro = "true", -- "false": fade-in on open, fade-out on close
-		startintro_size = 80, -- initial square size
-		squareintro_time = 1.2,
-		squarecontorn = "true", -- "false": removes the outline around the intro square
+		-- Opening intro animation. Intro and squarecontorn accept booleans or "true"/"false".
+		Intro = "true", -- false skips the intro and uses a simple fade.
+		startintro_size = 80, -- Initial intro square size in pixels.
+		squareintro_time = 1.2, -- Intro animation duration in seconds.
+		squarecontorn = "true", -- false hides the outline around the intro square.
 
-		-- Themes Config
-		Changelogocolor = true,
-		Changeiconscolor = true,
-		ChangeTheme = "true", -- "false": disable moon icon to change Theme
+		-- Theme controls. Set ChangeTheme=false to hide the in-UI theme switch.
+		Changelogocolor = true, -- Tint the logo using the active theme accent.
+		Changeiconscolor = true, -- Tint built-in icons using the active theme.
+		ChangeTheme = "true",
 
-		-- Section Config
+		-- Optional links and information cards shown in the interface.
 		discord_link = "",
 		website_link = "",
 
-		-- Cards ("true" / "false")
+		-- Set each card option to true/false (or "true"/"false") to show/hide it.
 		Discord = "true",
 		Website = "false",
 		Informations = "true",
@@ -172,15 +188,18 @@ __modules["variables"] = function()
 			autoconfirm = false, -- true: runs the Callback automatically when the UI opens
 		},
 
-		-- Notification style
+		-- Notification style preset; can also be changed with SetNotifStyle(...).
 		NotifStyle = "1",
 
-		-- Tabs style: "1" = Tabs in a column on the left, "2" = Tabs in a row under the topbar
+		-- "1" places tabs in a left column; "2" places them in a row below the top bar.
 		TabsStyle = "1",
 
-		-- Games
+		-- Optional allowlist: set [game.PlaceId] = true for each supported experience.
 		SupportedGames = {},
-        -- Automatically opens after the GUI intro/content has finished loading.
+        -- Custom keyless popup. It appears after the main UI finishes loading.
+        -- Set Enabled=false to remove it, or AutoShow=false to disable automatic display.
+        -- LoaderUrl is fetched and executed when the user chooses the popup's run button.
+        -- IconAssetId accepts an rbxassetid://... image ID; AnimationTime is seconds.
         KeylessPopup = {
             Enabled = true,
             AutoShow = true,
@@ -199,9 +218,10 @@ __modules["variables"] = function()
             MutedColor = Color3.fromRGB(160, 160, 160),
         },
 
-		-- Script Execution
+		-- Runs after a key validates. Callback receives (key, authContext), where
+		-- authContext.IsPremium/authContext.Premium is true for a Panda premium key.
 		Callback = function(key)
-			-- your script here
+			-- Put the script to run after successful validation here.
 		end,
 	}
 end
@@ -646,7 +666,11 @@ __modules["utilities/panda"] = function()
 				return false, tostring(success)
 			end
 			if success then
-				self.isPremium = isPremium
+				if type(isPremium) == "boolean" then
+					self.isPremium = isPremium
+				else
+					self.isPremium = nil
+				end
 				return true
 			end
 			return false, REASONS[reason] or tostring(reason or "key is invalid.")
@@ -665,7 +689,11 @@ __modules["utilities/panda"] = function()
 
 			if type(result) == "table" then
 				if result.success == true then
-					self.isPremium = result.isPremium
+					if type(result.isPremium) == "boolean" then
+						self.isPremium = result.isPremium
+					else
+						self.isPremium = nil
+					end
 					self.expiry = result.expiresAt
 					self.expiryUnix = result.expiresAtUnix
 					self.timeLeft = result.timeLeft
@@ -3692,6 +3720,21 @@ function UI.SetGetkeyIcon(icon)
 	applyGetkeyAll()
 end
 
+-- Create the GUI. Any matching fields in `options` override the defaults from
+-- the variables module above. Example:
+--   local Window = KeySystem.new({
+--       Title = "My Hub",
+--       Description = "Enter your access key",
+--       Theme = "Dark",
+--       Logo = "rbxassetid://1234567890",
+--       KeylessPopup = {
+--           Enabled = true,
+--           AutoShow = true,
+--           IconAssetId = "rbxassetid://9876543210",
+--           LoaderUrl = "https://example.com/keyless.lua",
+--       },
+--       Callback = function(key, authContext) ... end,
+--   })
 function UI.new(options)
 	local cfg = {}
 	for k, v in pairs(Variables) do
@@ -3951,7 +3994,7 @@ function UI.new(options)
 	-- Errors here are caught by the pcall in runKeyCheck ("Something went wrong").
 	local function validateKey(key)
 		local reason
-		local isPremium = false
+		local isPremium = nil
 
 		-- Key = { "a", "b" } | "a" | function(key) | Jnkie:Validator()
 		if KEY_LIST ~= nil then
@@ -3975,10 +4018,12 @@ function UI.new(options)
 		-- KeySystem.API (Platoboost / Panda / Jnkie / custom)
 		for _, service in ipairs(API_SERVICES) do
 			-- Clear any previous result so a later validation can't inherit premium status.
-			service.isPremium = false
+			service.isPremium = nil
 			local ok, valid, why = pcall(service.CheckKey, service, key)
 			if ok and valid then
-				isPremium = service.isPremium == true
+				if type(service.isPremium) == "boolean" then
+					isPremium = service.isPremium
+				end
 				return true, nil, isPremium
 			end
 			reason = (ok and why) or (not ok and tostring(valid)) or reason
@@ -5707,7 +5752,7 @@ function UI.new(options)
 				return
 			end
 			local ok, valid, reason, isPremium = pcall(validateKey, key)
-			result = { ok = ok, valid = valid, reason = reason, isPremium = isPremium == true }
+			result = { ok = ok, valid = valid, reason = reason, isPremium = isPremium }
 		end)
 
 		fadeContent(0, 0.25)
@@ -5862,9 +5907,11 @@ function UI.new(options)
 				callback = fn
 			end
 			if type(callback) == "function" then
+				local premiumStatus = result and result.isPremium
 				local authContext = {
-					IsPremium = result and result.isPremium == true or false,
-					Premium = result and result.isPremium == true or false,
+					IsPremium = premiumStatus,
+					Premium = premiumStatus,
+					PremiumKnown = type(premiumStatus) == "boolean",
 				}
 				local ok, err = pcall(callback, key, authContext)
 				if not ok then
@@ -6199,6 +6246,12 @@ end
 
 local KeySystem = {}
 
+-- Setup-script customization examples (call these before or after KeySystem.new):
+--   KeySystem:SetNotifStyle("pill")
+--   KeySystem:SetTabsStyle("1")       -- left-side tabs; "2" puts tabs below the top bar
+--   KeySystem:SetUIFont("Gotham")
+--   KeySystem:SetTitleFont("GothamBold")
+--   KeySystem:GetMethod({ Title = "Get Key", Icon = "key", URL = "https://example.com" })
 function KeySystem.new(options)
 	return import("components/window/ui").new(options)
 end
